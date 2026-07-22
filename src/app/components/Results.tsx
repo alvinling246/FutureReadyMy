@@ -693,7 +693,10 @@ export function Results({ results, onStartOver, onOpenChatbot }: ResultsProps) {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }} formatter={(v: number, name: string) => [`${v}%`, name === "percentage" ? "Your Score" : "SME Average"]} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: "12px", border: "1px solid #e5e7eb" }}
+                        formatter={(v, name) => [`${v ?? 0}%`, name === "percentage" ? "Your Score" : "SME Average"]}
+                      />
                       <Legend formatter={v => v === "percentage" ? "Your Score" : "SME Average"} />
                       <Bar dataKey="percentage" name="percentage" radius={[6, 6, 0, 0]}>
                         {categoryData.map(cat => <Cell key={cat.name} fill={CATEGORY_COLORS[cat.name]} />)}
