@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { MessageCircle } from "lucide-react";
 import { LandingPage } from "./components/LandingPage";
 import { Assessment, type AssessmentResults } from "./components/Assessment";
 import { Results } from "./components/Results";
@@ -22,6 +23,7 @@ export default function App() {
 
   const handleStartAssessment = () => {
     scrollToTop();
+    setIsChatbotOpen(false);
     setAppState("assessment");
   };
 
@@ -89,8 +91,8 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Floating Chatbot Button */}
-      {!isChatbotOpen && appState !== "landing" && (
+      {/* Floating Chatbot Button — results page only to avoid blocking assessment navigation on mobile */}
+      {!isChatbotOpen && appState === "results" && (
         <motion.button
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -99,26 +101,22 @@ export default function App() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.96 }}
           onClick={handleOpenChatbot}
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-3 pl-3 pr-4 py-2.5 rounded-full text-white"
+          aria-label="Chat with Rina"
+          title="Chat with Rina"
+          className="fixed z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full text-white flex items-center justify-center right-4 bottom-[max(1rem,env(safe-area-inset-bottom))]"
           style={{
-            background: "#1b4332",
+            background: "linear-gradient(135deg, #3d7a5c 0%, #1b4332 100%)",
             boxShadow: "0 4px 20px rgba(27,67,50,0.35), 0 1px 4px rgba(0,0,0,0.12)",
           }}
         >
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2} />
           <span
-            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0"
-            style={{ background: "rgba(255,255,255,0.18)" }}
-          >
-            RA
-          </span>
-          <div className="text-left leading-tight">
-            <p className="text-sm font-semibold">Chat with Rina</p>
-            <p className="text-xs" style={{ color: "#86efac" }}>Digital Consultant · Online</p>
-          </div>
+            className="absolute top-2.5 right-2.5 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border-2 border-[#1b4332]"
+            style={{ background: "#86efac" }}
+          />
         </motion.button>
       )}
 
-      {/* Chatbot Component */}
       <Chatbot isOpen={isChatbotOpen} onClose={handleCloseChatbot} />
     </div>
   );

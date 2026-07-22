@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Send, Settings, X, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface ChatbotProps {
   isOpen: boolean;
@@ -14,36 +14,42 @@ interface Message {
   timestamp: Date;
 }
 
-const SYSTEM_PROMPT = `You are Rina Ahmad, a friendly and knowledgeable digital transformation consultant at FutureReadyMY. You help Malaysian SME business owners navigate their digital journey.
+interface QuickQA {
+  question: string;
+  answer: string;
+}
 
-You specialise in:
-- Cloud storage (Google Drive, OneDrive, Dropbox, AWS, Azure)
-- Digital payments and e-wallets (Touch 'n Go, GrabPay, Boost, iPay88, SenangPay, Revenue Monster)
-- Cybersecurity best practices (MFA, backups, phishing awareness, antivirus)
-- Data analytics and business insights
-- Digital marketing, social media, and online presence
-- Malaysian grants and incentives (MDEC SME Digitalisation Grant, SME Corp, PENJANA)
-
-Your communication style:
-- Warm, conversational, and encouraging — like a knowledgeable friend
-- Use "we" and "let's" to make it collaborative
-- Occasionally use light Malaysian expressions naturally (e.g., "Good lah!", "No worries")
-- Keep responses focused and practical — 2–4 short paragraphs max
-- Always offer a follow-up question or next step
-- Use RM when giving cost examples
-
-Stay on topic — if asked about unrelated things, gently steer back to digital transformation.`;
-
-const API_KEY_STORAGE = "futurereadymy_anthropic_key";
-const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_API_VERSION = "2023-06-01";
-const ANTHROPIC_MODEL = "claude-3-5-sonnet-latest";
-
-const SUGGESTIONS = [
-  "How do I get started with cloud storage?",
-  "Which e-wallet is best for my shop?",
-  "What is MFA and why do I need it?",
-  "Are there any grants I can apply for?",
+const QUICK_QA: QuickQA[] = [
+  {
+    question: "Where should I start with my roadmap?",
+    answer:
+      "Start with the top recommendation marked as critical or high priority. Focus on one action at a time — complete it fully before moving to the next. Most SMEs see the fastest results by fixing cloud backup or digital payments first.",
+  },
+  {
+    question: "How do I get started with cloud storage?",
+    answer:
+      "A good first step is Google Drive or OneDrive so your files are not only on one laptop. Set up shared folders by team, then enable daily auto-backup. This usually takes under half a day and gives immediate protection from data loss.",
+  },
+  {
+    question: "Which e-wallet should I accept first?",
+    answer:
+      "For Malaysian SMEs, start with DuitNow QR because customers can pay using many banking apps and e-wallets. It's simple to deploy at the counter and helps reduce cash handling. After that, you can add Touch 'n Go or GrabPay based on your customer profile.",
+  },
+  {
+    question: "What is MFA and why do I need it?",
+    answer:
+      "MFA means users need a second verification step, not only a password. It is one of the fastest ways to reduce account takeover risk. Start by enabling MFA on business email, banking, and cloud accounts first.",
+  },
+  {
+    question: "Are there Malaysian grants for SMEs?",
+    answer:
+      "Yes — you can explore support programmes from MDEC and SME Corp. Prepare simple documentation first: current digital gaps, expected outcomes, and estimated budget. That makes grant applications much easier and clearer.",
+  },
+  {
+    question: "How do I convince my team to go digital?",
+    answer:
+      "Start small with one tool that saves time immediately — like WhatsApp Business or a shared cloud folder. Show quick wins in the first week, then involve staff in choosing the next step. People adopt change faster when they see personal benefit, not just company goals.",
+  },
 ];
 
 function TypingDots() {
@@ -61,8 +67,8 @@ function TypingDots() {
   );
 }
 
-function AdvisorAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
-  const sz = size === "sm" ? "w-7 h-7 text-xs" : size === "lg" ? "w-12 h-12 text-lg" : "w-9 h-9 text-sm";
+function AdvisorAvatar({ size = "md" }: { size?: "sm" | "md" }) {
+  const sz = size === "sm" ? "w-7 h-7 text-xs" : "w-9 h-9 text-sm";
   return (
     <div
       className={`${sz} rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white select-none`}
@@ -73,51 +79,40 @@ function AdvisorAvatar({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   );
 }
 
+function getBotReply(input: string) {
+  const exact = QUICK_QA.find((item) => item.question === input);
+  if (exact) return exact.answer;
+
+  return "Pick one of the quick questions below — I'll share practical guidance for Malaysian SMEs. No sign-up needed, just step-by-step tips you can act on today.";
+}
+
 export function Chatbot({ isOpen, onClose }: ChatbotProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
-      text: "Hi there! I'm Rina, your digital transformation consultant. I'm here to help your business go digital — from cloud storage to e-wallets and cybersecurity. What's on your mind?",
+      text: "Hi! I'm Rina, your digital consultant for FutureReadyMY. Tap a question below and I'll share quick, practical guidance for your business.",
       isBot: true,
       timestamp: new Date(),
     },
   ]);
-  const [inputValue, setInputValue] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [keyDraft, setKeyDraft] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(API_KEY_STORAGE) ?? "";
-    setApiKey(saved);
-  }, []);
+  const replyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isTyping]);
 
-  const saveApiKey = () => {
-    const trimmed = keyDraft.trim();
-    if (!trimmed) return;
-    localStorage.setItem(API_KEY_STORAGE, trimmed);
-    setApiKey(trimmed);
-    setShowSettings(false);
-    setKeyDraft("");
-  };
+  useEffect(() => {
+    return () => {
+      if (replyTimerRef.current) {
+        clearTimeout(replyTimerRef.current);
+      }
+    };
+  }, []);
 
-  const clearApiKey = () => {
-    localStorage.removeItem(API_KEY_STORAGE);
-    setApiKey("");
-    setKeyDraft("");
-  };
-
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isStreaming) return;
-    setShowSuggestions(false);
+  const sendMessage = (text: string) => {
+    if (!text.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: `u-${Date.now()}`,
@@ -125,87 +120,21 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
       isBot: false,
       timestamp: new Date(),
     };
+
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
-    setIsStreaming(true);
+    setIsTyping(true);
 
-    const botId = `b-${Date.now()}`;
-    setMessages((prev) => [...prev, { id: botId, text: "", isBot: true, timestamp: new Date() }]);
-
-    try {
-      const history = [...messages, userMessage]
-        .filter((m) => m.id !== "welcome" && m.text.trim())
-        .map((m) => ({
-          role: m.isBot ? ("assistant" as const) : ("user" as const),
-          content: m.text,
-        }));
-
-      const response = await fetch(ANTHROPIC_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": ANTHROPIC_API_VERSION,
-        },
-        body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: 1024,
-          system: SYSTEM_PROMPT,
-          messages: history.length > 0 ? history : [{ role: "user", content: text.trim() }],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`${response.status}:${errorBody}`);
-      }
-
-      const data = await response.json() as {
-        content?: Array<{ type?: string; text?: string }>;
+    const reply = getBotReply(text.trim());
+    replyTimerRef.current = setTimeout(() => {
+      const botMessage: Message = {
+        id: `b-${Date.now()}`,
+        text: reply,
+        isBot: true,
+        timestamp: new Date(),
       };
-
-      const accumulated = (data.content ?? [])
-        .filter((block) => block.type === "text")
-        .map((block) => block.text ?? "")
-        .join("")
-        .trim();
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === botId
-            ? { ...m, text: accumulated || "I'm sorry, I didn't quite catch that. Could you try again?" }
-            : m
-        )
-      );
-
-      if (!accumulated) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === botId
-              ? { ...m, text: "I'm sorry, I didn't quite catch that. Could you try again?" }
-              : m
-          )
-        );
-      }
-    } catch (err) {
-      const msg = err instanceof Error && err.message.startsWith("401:")
-        ? "It looks like the API key isn't valid. Tap the ⚙ settings to update it."
-        : err instanceof Error && err.message.startsWith("429:")
-        ? "We've hit the rate limit — give it a moment and try again."
-        : "Something went wrong on my end. Please try again shortly.";
-      setMessages((prev) =>
-        prev.map((m) => (m.id === botId ? { ...m, text: msg } : m))
-      );
-    } finally {
-      setIsStreaming(false);
-    }
-  }, [apiKey, isStreaming, messages]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(inputValue);
-    }
+      setMessages((prev) => [...prev, botMessage]);
+      setIsTyping(false);
+    }, 450);
   };
 
   const formatTime = (d: Date) =>
@@ -219,16 +148,13 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.92, y: 16 }}
           transition={{ type: "spring", stiffness: 320, damping: 28 }}
-          className="fixed bottom-24 right-4 z-50 flex flex-col overflow-hidden"
+          className="fixed z-50 flex flex-col overflow-hidden w-[calc(100vw-2rem)] max-w-[380px] h-[min(580px,calc(100vh-6rem))] right-4 bottom-[max(5rem,calc(env(safe-area-inset-bottom)+4rem))]"
           style={{
-            width: "380px",
-            height: "580px",
             borderRadius: "20px",
             background: "#ffffff",
             boxShadow: "0 8px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)",
           }}
         >
-          {/* ── Header ── */}
           <div
             className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
             style={{ background: "#1b4332" }}
@@ -243,106 +169,26 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white leading-tight">Rina Ahmad</p>
               <p className="text-xs leading-tight" style={{ color: "#86efac" }}>
-                Digital Consultant · Online
+                Digital Consultant
               </p>
             </div>
-            <button
-              onClick={() => setShowSettings((v) => !v)}
-              className="p-1.5 rounded-full transition-colors hover:bg-white/10"
-              style={{ color: "rgba(255,255,255,0.7)" }}
-              title="Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
             <button
               onClick={onClose}
               className="p-1.5 rounded-full transition-colors hover:bg-white/10"
               style={{ color: "rgba(255,255,255,0.7)" }}
+              aria-label="Close chat"
             >
               <ChevronDown className="w-4 h-4" />
             </button>
           </div>
 
-          {/* ── Settings Panel ── */}
-          <AnimatePresence>
-            {showSettings && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden flex-shrink-0"
-                style={{ background: "#f0fdf4", borderBottom: "1px solid #bbf7d0" }}
-              >
-                <div className="px-4 py-3 space-y-2">
-                  <p className="text-xs font-semibold" style={{ color: "#166534" }}>
-                    Anthropic API Key
-                  </p>
-                  <p className="text-xs" style={{ color: "#4b7a5a" }}>
-                    Required to enable AI responses.{" "}
-                    <a
-                      href="https://console.anthropic.com/settings/keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                      style={{ color: "#166534" }}
-                    >
-                      Get your key →
-                    </a>
-                  </p>
-                  {apiKey ? (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="flex-1 text-xs px-2 py-1 rounded-lg font-mono truncate"
-                        style={{ background: "#dcfce7", color: "#166534" }}
-                      >
-                        {apiKey.slice(0, 12)}••••••••••••
-                      </span>
-                      <button
-                        onClick={clearApiKey}
-                        className="text-xs px-2 py-1 rounded-lg"
-                        style={{ background: "#fee2e2", color: "#991b1b" }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        placeholder="sk-ant-..."
-                        value={keyDraft}
-                        onChange={(e) => setKeyDraft(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && saveApiKey()}
-                        className="flex-1 text-xs px-3 py-1.5 rounded-lg border outline-none"
-                        style={{ borderColor: "#86efac", fontFamily: "monospace" }}
-                      />
-                      <button
-                        onClick={saveApiKey}
-                        className="text-xs px-3 py-1.5 rounded-lg text-white font-medium"
-                        style={{ background: "#1b4332" }}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ── Message Area ── */}
-          <div
-            className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
-            style={{ background: "#f9f6f2" }}
-          >
-            {/* Date label */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ background: "#f9f6f2" }}>
             <div className="flex justify-center">
               <span
                 className="text-xs px-3 py-1 rounded-full"
                 style={{ background: "#e7e0d8", color: "#78716c" }}
               >
-                Today
+                Quick guidance
               </span>
             </div>
 
@@ -374,11 +220,7 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
                           }
                     }
                   >
-                    {msg.text === "" && msg.isBot ? (
-                      <TypingDots />
-                    ) : (
-                      <p className="whitespace-pre-wrap">{msg.text}</p>
-                    )}
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
                   </div>
                   <span
                     className="text-xs px-1"
@@ -393,92 +235,56 @@ export function Chatbot({ isOpen, onClose }: ChatbotProps) {
               </motion.div>
             ))}
 
-            {/* Suggestions */}
-            <AnimatePresence>
-              {showSuggestions && !isStreaming && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  className="flex flex-col gap-2 pl-9"
+            {isTyping && (
+              <div className="flex items-end gap-2 justify-start">
+                <AdvisorAvatar size="sm" />
+                <div
+                  className="px-3.5 py-2.5 text-sm leading-relaxed"
+                  style={{
+                    background: "#ffffff",
+                    color: "#1c1917",
+                    borderRadius: "4px 18px 18px 18px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
+                  }}
                 >
-                  {SUGGESTIONS.map((s, i) => (
-                    <button
-                      key={i}
-                      onClick={() => sendMessage(s)}
-                      disabled={!apiKey}
-                      className="text-left text-xs px-3 py-2 rounded-xl border transition-all disabled:opacity-40"
-                      style={{
-                        background: "#ffffff",
-                        borderColor: "#d6cfc6",
-                        color: "#1b4332",
-                        fontWeight: 500,
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = "#f0fdf4";
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#6ee7b7";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.background = "#ffffff";
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = "#d6cfc6";
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <TypingDots />
+                </div>
+              </div>
+            )}
+
+            {!isTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col gap-2 pl-9"
+              >
+                {QUICK_QA.map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(item.question)}
+                    className="text-left text-xs px-3 py-2 rounded-xl border transition-all hover:border-[#1b4332]/40 hover:shadow-sm"
+                    style={{
+                      background: "#ffffff",
+                      borderColor: "#d6cfc6",
+                      color: "#1b4332",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {item.question}
+                  </button>
+                ))}
+              </motion.div>
+            )}
 
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ── Input ── */}
           <div
-            className="flex-shrink-0 px-3 py-3"
+            className="flex-shrink-0 px-4 py-3 text-center"
             style={{ background: "#ffffff", borderTop: "1px solid #e7e0d8" }}
           >
-            {!apiKey && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={() => setShowSettings(true)}
-                className="w-full text-xs py-2 rounded-xl mb-2 font-medium transition-colors"
-                style={{ background: "#fef3c7", color: "#92400e" }}
-              >
-                ⚙ Set up your API key to start chatting
-              </motion.button>
-            )}
-            <div
-              className="flex items-end gap-2 rounded-2xl px-3 py-2"
-              style={{ background: "#f3ede8", border: "1.5px solid #e7e0d8" }}
-            >
-              <textarea
-                ref={inputRef}
-                rows={1}
-                placeholder={apiKey ? "Message Rina…" : "API key required"}
-                value={inputValue}
-                disabled={isStreaming || !apiKey}
-                onChange={(e) => {
-                  setInputValue(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 96)}px`;
-                }}
-                onKeyDown={handleKeyDown}
-                className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed disabled:opacity-40"
-                style={{ color: "#1c1917", maxHeight: "96px", lineHeight: "1.5" }}
-              />
-              <button
-                onClick={() => sendMessage(inputValue)}
-                disabled={!inputValue.trim() || isStreaming || !apiKey}
-                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-30"
-                style={{ background: "#1b4332", color: "white" }}
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <p className="text-center text-xs mt-1.5" style={{ color: "#c4b8ae" }}>
-              Powered by Claude · FutureReadyMY
+            <p className="text-xs" style={{ color: "#a8a29e" }}>
+              Preset guidance only — tap a question above
             </p>
           </div>
         </motion.div>

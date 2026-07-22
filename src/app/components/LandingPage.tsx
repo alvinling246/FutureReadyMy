@@ -262,7 +262,7 @@ export function LandingPage({ onStartAssessment }: LandingPageProps) {
             {[
               { step: "01", icon: Building2, title: "Take the Assessment", desc: "Answer 15 questions across 5 digital areas in under 5 minutes. No sign-up needed.", color: "#2563eb" },
               { step: "02", icon: BarChart3, title: "Get Your Score", desc: "Instantly receive your Digital Readiness Score with detailed breakdown by category.", color: "#7c3aed" },
-              { step: "03", icon: TrendingUp, title: "Follow Your Roadmap", desc: "Access personalised recommendations and connect with our AI consultant Rina for guidance.", color: "#059669" },
+              { step: "03", icon: TrendingUp, title: "Follow Your Roadmap", desc: "Access personalised recommendations and connect with our digital consultant Rina for guidance.", color: "#059669" },
             ].map(({ step, icon: Icon, title, desc, color }, i) => (
               <motion.div
                 key={step}
@@ -486,7 +486,7 @@ const assessmentAreas = [
 
 const testimonials = [
   { name: "Ahmad Razif", business: "Kedai Kasut Razif, Johor Bahru", quote: "I had no idea my business was missing so many digital basics until this assessment. The roadmap was eye-opening and helped me prioritise what to fix first.", initials: "AR", tier: "Getting Started", color: "#f59e0b" },
-  { name: "Priya Krishnan", business: "PK Catering & Events, Penang", quote: "Rina the AI consultant is amazing! She explained MFA in such simple terms and suggested Touch 'n Go eWallet for my catering business. Sales have grown 40% since.", initials: "PK", tier: "Digitally Progressing", color: "#3b82f6" },
+  { name: "Priya Krishnan", business: "PK Catering & Events, Penang", quote: "Rina the digital consultant is amazing! She explained MFA in such simple terms and suggested Touch 'n Go eWallet for my catering business. Sales have grown 40% since.", initials: "PK", tier: "Digitally Progressing", color: "#3b82f6" },
   { name: "Tan Wei Ming", business: "MW Tech Solutions, KL", quote: "As a tech company, I expected a high score — and we got Digital Leader. But the gaps identified in customer analytics were things we genuinely overlooked.", initials: "TW", tier: "Digital Leader", color: "#059669" },
 ];
 
