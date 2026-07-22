@@ -1,7 +1,8 @@
+# FutureReadyMy
 
-  # Digital Readiness Assessment Tool
+Digital Readiness Assessment Tool (Make Your Business Digitalized)
 
-  This is a code bundle for Digital Readiness Assessment Tool. The original project is available at https://www.figma.com/design/ApRFLGY6ZHoPDzMkY78biz/Digital-Readiness-Assessment-Tool.
+This is a code bundle for Digital Readiness Assessment Tool. The original project is available at https://www.figma.com/design/ApRFLGY6ZHoPDzMkY78biz/Digital-Readiness-Assessment-Tool.
 
 ## Running locally
 
@@ -21,4 +22,3 @@ Run `npm run start` to run the production server.
 2. Import the repository in Vercel.
 3. Keep the default framework detection (**Next.js**).
 4. Deploy.
-  
